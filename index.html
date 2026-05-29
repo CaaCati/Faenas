@@ -8,7 +8,7 @@
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2563eb">
-    <link rel="apple-touch-icon" href="icono.png">
+    <link rel="apple-touch-icon" href="icono.png"> <!-- Icono de instalación -->
     
     <!-- External Assets -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -145,10 +145,10 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo-img">
-                    <img src="icono.png" alt="Logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1216/1216844.png'">
+                    <img src="logo.png" alt="Logo Municipalidad" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1216/1216844.png'">
                 </div>
                 <div class="sidebar-title">
-                    Municipalidad de Caá Catí
+                     Municicipalidad de Caá Catí
                     <span>Gestión de Faenas</span>
                 </div>
             </div>
@@ -175,7 +175,7 @@
         <main class="main-content">
             <div class="header-top">
                 <div>
-                    <h2 class="page-title" id="page-title">Centro de control de Faenas</h2>
+                    <h2 class="page-title" id="page-title">Control de Faenas</h2>
                     <p class="current-date" id="fecha-hoy"></p>
                 </div>
                 <button class="btn btn-primary" onclick="switchTab('nueva')">
@@ -506,7 +506,7 @@
                     `Estimado/a *${f.nombre}*, le informamos que la faena del *${formatFecha(f.fecha)}* ` +
                     `correspondiente a *${f.animales} animales* registra un importe de *${montoFmt}*.\n\n` +
                     `Por favor realice la transferencia al siguiente alias: *${ALIAS}*\n\n` +
-                    `_Luego de realizar el pago, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`
+                    `_Luego de realizada, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`
                 );
                 const waLink = `https://wa.me/549${tel}?text=${msg}`;
 
