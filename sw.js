@@ -1,9 +1,10 @@
-const CACHE_NAME = 'faenas-v2';
+const CACHE_NAME = 'faenas-v3';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './icono.png'
+  './icono.png',
+  './logo.png'
 ];
 
 self.addEventListener('install', event => {
