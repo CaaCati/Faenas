@@ -3,9 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Municipalidad de Caá Catí</title>
+    <title>Faenas Municipales</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="icono.png">
+    
+    <!-- External Assets -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --primary: #2563eb;
@@ -137,7 +145,7 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo-img">
-                    <img src="logo.png" alt="Logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1216/1216844.png'">
+                    <img src="icono.png" alt="Logo" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1216/1216844.png'">
                 </div>
                 <div class="sidebar-title">
                     Municipalidad de Caá Catí
@@ -498,7 +506,7 @@
                     `Estimado/a *${f.nombre}*, le informamos que la faena del *${formatFecha(f.fecha)}* ` +
                     `correspondiente a *${f.animales} animales* registra un importe de *${montoFmt}*.\n\n` +
                     `Por favor realice la transferencia al siguiente alias: *${ALIAS}*\n\n` +
-                    `_Luego de realizar el pago, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`
+                    `_Una vez realizada, envíe el comprobante por este medio._`
                 );
                 const waLink = `https://wa.me/549${tel}?text=${msg}`;
 
@@ -590,6 +598,15 @@
         function copiarTel(tel) {
             navigator.clipboard.writeText(tel);
             toast('Teléfono copiado al portapapeles');
+        }
+
+        // Registro del Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('PWA lista'))
+                    .catch(err => console.log('Error PWA', err));
+            });
         }
 
         window.onload = init;
