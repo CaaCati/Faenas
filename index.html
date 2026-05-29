@@ -148,7 +148,7 @@
                     <img src="logo.png" alt="Logo Municipalidad" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1216/1216844.png'">
                 </div>
                 <div class="sidebar-title">
-                     Municicipalidad de Caá Catí
+                    Caá Catí
                     <span>Gestión de Faenas</span>
                 </div>
             </div>
@@ -501,10 +501,11 @@
                 const montoFmt = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(f.monto);
                 
                 const tel = (f.telefono || '').toString().replace(/\D/g, '');
+                const animalesTxt = Number(f.animales) === 1 ? '1 animal' : `${f.animales} animales`;
                 const msg = encodeURIComponent(
                     `*Municipalidad de Caá Catí — Faenas*\n\n` +
                     `Estimado/a *${f.nombre}*, le informamos que la faena del *${formatFecha(f.fecha)}* ` +
-                    `correspondiente a *${f.animales} animales* registra un importe de *${montoFmt}*.\n\n` +
+                    `correspondiente a *${animalesTxt}* registra un importe de *${montoFmt}*.\n\n` +
                     `Por favor realice la transferencia al siguiente alias: *${ALIAS}*\n\n` +
                     `_Luego de realizada, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`
                 );
