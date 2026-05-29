@@ -1,9 +1,9 @@
-const CACHE_NAME = 'faenas-v1';
+const CACHE_NAME = 'faenas-v2';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './logo.png'
+  './icono.png'
 ];
 
 self.addEventListener('install', event => {
@@ -15,7 +15,6 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Solo cachear assets estáticos, las peticiones a la API deben ser siempre live
   if (event.request.url.includes('script.google.com')) {
     return fetch(event.request);
   }
