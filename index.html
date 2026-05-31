@@ -330,6 +330,7 @@
     <script>
         const API = 'https://script.google.com/macros/s/AKfycbxveMtytdsyxYJCtupxHdsmcRVhw7EPgkM_AsCoU7be0n_mkhOmQTbwyBRJJEYuGlMPiw/exec';
         const ALIAS = 'MCC2025';
+        const BOT_URL = 'http://163.176.132.166:3002';
         let faenas = [], carniceros = [];
 
         function init() {
@@ -502,23 +503,26 @@
                 
                 const tel = (f.telefono || '').toString().replace(/\D/g, '');
                 const animalesTxt = Number(f.animales) === 1 ? '1 animal' : `${f.animales} animales`;
-                const msg = encodeURIComponent(
-                    `*Municipalidad de Caá Catí — Faenas*\n\n` +
+                const mensajeWA = `*Municipalidad de Caá Catí — Faenas*\n\n` +
                     `Estimado/a *${f.nombre}*, le informamos que la faena del *${formatFecha(f.fecha)}* ` +
                     `correspondiente a *${animalesTxt}* registra un importe de *${montoFmt}*.\n\n` +
                     `Por favor realice la transferencia al siguiente alias: *${ALIAS}*\n\n` +
-                    `_Luego de realizada, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`
-                );
-                const waLink = `https://wa.me/549${tel}?text=${msg}`;
+                    `_Luego de realizada, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`;
 
                 let acciones = '';
-                if (f.estado !== 'Pagado') {
+                if (f.estado === 'Pendiente') {
                     acciones = `
-                        <a href="${waLink}" target="_blank" class="btn btn-whatsapp btn-sm" onclick="setTimeout(()=>cambiarEstado(${f.id}, 'Enviado'), 2000)">
+                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id}, '${tel}', ${JSON.stringify(mensajeWA)})">
                             <i class="ti ti-brand-whatsapp"></i> Cobrar
-                        </a>
-                        <button class="btn btn-ghost btn-sm" onclick="cambiarEstado(${f.id}, '${f.estado === 'Pendiente' ? 'Enviado' : 'Pagado'}')">
-                            <i class="ti ti-${f.estado === 'Pendiente' ? 'send' : 'coin'}"></i>
+                        </button>
+                    `;
+                } else if (f.estado === 'Enviado') {
+                    acciones = `
+                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id}, '${tel}', ${JSON.stringify(mensajeWA)})">
+                            <i class="ti ti-brand-whatsapp"></i> Reenviar
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="cambiarEstado(${f.id}, 'Pagado')" title="Marcar como pagado">
+                            <i class="ti ti-coin"></i> Pagado
                         </button>
                     `;
                 } else {
@@ -536,6 +540,27 @@
                     </tr>
                 `;
             }).join('');
+        }
+
+        async function enviarNotificacion(id, telefono, mensaje) {
+            showLoading(true);
+            try {
+                const res = await fetch(`${BOT_URL}/enviar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telefono, mensaje })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    await cambiarEstado(id, 'Enviado');
+                    toast('✅ Notificación enviada por WhatsApp');
+                } else {
+                    toast('⚠️ Error al enviar: ' + (data.error || 'desconocido'));
+                }
+            } catch (e) {
+                toast('⚠️ No se pudo conectar con el bot. Verificá que esté activo.');
+            }
+            showLoading(false);
         }
 
         async function cambiarEstado(id, nuevoEstado) {
