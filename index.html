@@ -429,7 +429,7 @@
             const el = document.getElementById('lista-carniceros');
             el.innerHTML = carniceros.map(c => `
                 <tr>
-                    <td>#${c.id}</td>
+                    <td>${c.id}</td>
                     <td style="font-weight:600;">${c.nombre}</td>
                     <td>${c.telefono}</td>
                     <td>
@@ -521,7 +521,7 @@
                 if (f.estado === 'Pendiente') {
                     acciones = `
                         <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id})">
-                            <i class="ti ti-brand-whatsapp"></i> Cobrar
+                            <i class="ti ti-brand-whatsapp"></i> Enviar
                         </button>
                     `;
                 } else if (f.estado === 'Enviado') {
