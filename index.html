@@ -497,28 +497,36 @@
                 return;
             }
 
+            // Mapa de datos de envío indexado por ID de faena
+            window._faenaEnvio = {};
+
             el.innerHTML = filtradas.map(f => {
                 const badgeClass = f.estado === 'Pendiente' ? 'badge-pendiente' : f.estado === 'Enviado' ? 'badge-enviado' : 'badge-pagado';
                 const montoFmt = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(f.monto);
                 
                 const tel = (f.telefono || '').toString().replace(/\D/g, '');
                 const animalesTxt = Number(f.animales) === 1 ? '1 animal' : `${f.animales} animales`;
-                const mensajeWA = `*Municipalidad de Caá Catí — Faenas*\n\n` +
-                    `Estimado/a *${f.nombre}*, le informamos que la faena del *${formatFecha(f.fecha)}* ` +
-                    `correspondiente a *${animalesTxt}* registra un importe de *${montoFmt}*.\n\n` +
-                    `Por favor realice la transferencia al siguiente alias: *${ALIAS}*\n\n` +
-                    `_Luego de realizada, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`;
+
+                // Guardamos el mensaje en el mapa para no pasarlo inline
+                window._faenaEnvio[f.id] = {
+                    telefono: tel,
+                    mensaje: `*Municipalidad de Caá Catí — Faenas*\n\n` +
+                        `Estimado/a *${f.nombre}*, le informamos que la faena del *${formatFecha(f.fecha)}* ` +
+                        `correspondiente a *${animalesTxt}* registra un importe de *${montoFmt}*.\n\n` +
+                        `Por favor realice la transferencia al siguiente alias: *${ALIAS}*\n\n` +
+                        `_Luego de realizada, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`
+                };
 
                 let acciones = '';
                 if (f.estado === 'Pendiente') {
                     acciones = `
-                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id}, '${tel}', ${JSON.stringify(mensajeWA)})">
+                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id})">
                             <i class="ti ti-brand-whatsapp"></i> Cobrar
                         </button>
                     `;
                 } else if (f.estado === 'Enviado') {
                     acciones = `
-                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id}, '${tel}', ${JSON.stringify(mensajeWA)})">
+                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id})">
                             <i class="ti ti-brand-whatsapp"></i> Reenviar
                         </button>
                         <button class="btn btn-ghost btn-sm" onclick="cambiarEstado(${f.id}, 'Pagado')" title="Marcar como pagado">
@@ -542,7 +550,10 @@
             }).join('');
         }
 
-        async function enviarNotificacion(id, telefono, mensaje) {
+        async function enviarNotificacion(id) {
+            const envio = window._faenaEnvio[id];
+            if (!envio) return toast('⚠️ Error: datos de envío no encontrados');
+            const { telefono, mensaje } = envio;
             showLoading(true);
             try {
                 const res = await fetch(`${BOT_URL}/enviar`, {
