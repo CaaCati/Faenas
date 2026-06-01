@@ -624,15 +624,25 @@
             const telefono = document.getElementById('nuevo-tel').value.trim();
             if (!id || !nombre || !telefono) return toast('⚠️ ID, nombre y teléfono son requeridos');
 
+            const btn = document.querySelector('#tab-carniceros .btn-primary');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
+
             showLoading(true);
             const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'addCarnicero', id, nombre, telefono }) }).then(r => r.json());
             showLoading(false);
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-user-plus"></i> Registrar';
+
             if (res.ok) {
                 toast('✅ Carnicero registrado');
                 document.getElementById('nuevo-id').value = "";
                 document.getElementById('nuevo-nombre').value = "";
                 document.getElementById('nuevo-tel').value = "";
-                cargarCarniceros();
+                await cargarCarniceros();
+            } else {
+                toast('⚠️ ' + (res.error || 'Error al registrar'));
             }
         }
 
