@@ -297,7 +297,6 @@
                                     <th>ID</th>
                                     <th>Nombre Completo</th>
                                     <th>Teléfono / WhatsApp</th>
-                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="lista-carniceros">
@@ -308,6 +307,10 @@
 
                     <div class="form-card" style="padding: 1.5rem;">
                         <h4 style="margin-bottom: 1rem;">Nuevo Carnicero</h4>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label>ID (N° Contribuyente)</label>
+                            <input type="text" id="nuevo-id" class="form-control" placeholder="Ej: 1234">
+                        </div>
                         <div class="form-group" style="margin-bottom: 1rem;">
                             <label>Nombre Completo</label>
                             <input type="text" id="nuevo-nombre" class="form-control" placeholder="Ej: Juan Pérez">
@@ -355,7 +358,7 @@
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById('tab-' + t).classList.add('active');
             
-            const titles = { faenas: 'Dashboard de Faenas', nueva: 'Nueva Faena', carniceros: 'Gestión de Carniceros' };
+            const titles = { faenas: 'Control de Faenas', nueva: 'Nueva Faena', carniceros: 'Gestión de Carniceros' };
             document.getElementById('page-title').textContent = titles[t];
         }
 
@@ -432,9 +435,6 @@
                     <td>${c.id}</td>
                     <td style="font-weight:600;">${c.nombre}</td>
                     <td>${c.telefono}</td>
-                    <td>
-                        <button class="btn btn-ghost btn-sm" onclick="copiarTel('${c.telefono}')"><i class="ti ti-copy"></i></button>
-                    </td>
                 </tr>
             `).join('');
         }
@@ -617,15 +617,17 @@
         }
 
         async function agregarCarnicero() {
+            const id = document.getElementById('nuevo-id').value.trim();
             const nombre = document.getElementById('nuevo-nombre').value.trim();
             const telefono = document.getElementById('nuevo-tel').value.trim();
-            if (!nombre || !telefono) return toast('⚠️ Nombre y teléfono requeridos');
+            if (!id || !nombre || !telefono) return toast('⚠️ ID, nombre y teléfono son requeridos');
 
             showLoading(true);
-            const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'addCarnicero', nombre, telefono }) }).then(r => r.json());
+            const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'addCarnicero', id, nombre, telefono }) }).then(r => r.json());
             showLoading(false);
             if (res.ok) {
                 toast('✅ Carnicero registrado');
+                document.getElementById('nuevo-id').value = "";
                 document.getElementById('nuevo-nombre').value = "";
                 document.getElementById('nuevo-tel').value = "";
                 cargarCarniceros();
