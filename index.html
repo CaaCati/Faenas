@@ -526,12 +526,14 @@
                     `;
                 } else if (f.estado === 'Enviado') {
                     acciones = `
-                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id})">
-                            <i class="ti ti-brand-whatsapp"></i> Reenviar
-                        </button>
-                        <button class="btn btn-ghost btn-sm" onclick="cambiarEstado(${f.id}, 'Pagado')" title="Marcar como pagado">
-                            <i class="ti ti-coin"></i> Pagado
-                        </button>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id})">
+                                <i class="ti ti-brand-whatsapp"></i> Reenviar
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="cambiarEstado(${f.id}, 'Pagado')" title="Marcar como pagado">
+                                <i class="ti ti-coin"></i> Pagado
+                            </button>
+                        </div>
                     `;
                 } else {
                     acciones = `<span style="color:var(--success); font-size:0.8rem;"><i class="ti ti-check"></i> ${formatFecha(f.fecha_pago)}</span>`;
@@ -544,7 +546,7 @@
                         <td><i class="ti ti-paw"></i> ${f.animales}</td>
                         <td style="font-weight:600;">${montoFmt}</td>
                         <td><span class="badge ${badgeClass}">${f.estado}</span></td>
-                        <td><div style="display:flex; gap:4px;">${acciones}</div></td>
+                        <td><div style="display:flex; flex-direction:column; gap:4px;">${acciones}</div></td>
                     </tr>
                 `;
             }).join('');
