@@ -133,6 +133,41 @@
         @media (min-width: 1024px) {
             .main-content { padding: 3rem; }
         }
+        /* ── MOBILE ─────────────────────────────────── */
+        @media (max-width: 768px) {
+            body { overflow: auto; }
+            .app-container { flex-direction: column; height: auto; min-height: 100vh; }
+            .sidebar { width: 100%; flex-direction: row; align-items: center; padding: 0; order: 2; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; border-top: 1px solid rgba(255,255,255,0.1); }
+            .sidebar-header { display: none; }
+            .sidebar-footer { display: none; }
+            .nav-menu { display: flex; flex-direction: row; width: 100%; flex: 1; }
+            .nav-item { flex: 1; flex-direction: column; gap: 2px; padding: 10px 4px 8px; font-size: 0.7rem; margin-bottom: 0; border-radius: 0; justify-content: center; text-align: center; }
+            .nav-item i { font-size: 1.4rem; }
+            .nav-item.active { background: var(--primary); box-shadow: none; }
+            .main-content { order: 1; padding: 1rem; padding-bottom: 85px; overflow-y: auto; }
+            .header-top { flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 1.25rem; }
+            .header-top .btn { width: 100%; justify-content: center; }
+            .page-title { font-size: 1.3rem; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.25rem; }
+            .stat-card { padding: 1rem; }
+            .stat-card-value { font-size: 1.4rem; }
+            .filters-panel { padding: 1rem; margin-bottom: 1.25rem; }
+            .filters-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .table-container { border-radius: var(--radius-md); overflow: visible; box-shadow: none; border: none; background: transparent; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tbody tr { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 10px; padding: 14px; box-shadow: var(--shadow); }
+            td { padding: 3px 0; border: none; font-size: 0.875rem; }
+            td:last-child { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+            .form-card { padding: 1.25rem; max-width: 100%; }
+            .form-grid { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+            .form-group.full { grid-column: span 1; }
+            #tab-carniceros > div { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 400px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .filters-grid { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
@@ -541,12 +576,12 @@
 
                 return `
                     <tr>
-                        <td style="font-weight:500;">${formatFecha(f.fecha)}</td>
-                        <td>${f.nombre}</td>
-                        <td><i class="ti ti-paw"></i> ${f.animales}</td>
-                        <td style="font-weight:600;">${montoFmt}</td>
-                        <td><span class="badge ${badgeClass}">${f.estado}</span></td>
-                        <td><div style="display:flex; flex-direction:column; gap:4px;">${acciones}</div></td>
+                        <td data-label="Fecha" style="font-weight:500;">${formatFecha(f.fecha)}</td>
+                        <td data-label="Carnicero">${f.nombre}</td>
+                        <td data-label="Animales"><i class="ti ti-paw"></i> ${f.animales}</td>
+                        <td data-label="Monto" style="font-weight:600;">${montoFmt}</td>
+                        <td data-label="Estado"><span class="badge ${badgeClass}">${f.estado}</span></td>
+                        <td data-label="Acciones"><div style="display:flex; flex-direction:column; gap:4px;">${acciones}</div></td>
                     </tr>
                 `;
             }).join('');
@@ -600,14 +635,24 @@
                 return;
             }
 
+            const btn = document.querySelector('#tab-nueva .btn-primary');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
+
             showLoading(true);
             const res = await fetch(API, { method: 'POST', body: JSON.stringify(data) }).then(r => r.json());
             showLoading(false);
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-device-floppy"></i> Guardar Registro';
+
             if (res.ok) {
                 toast('✅ Registro guardado con éxito');
                 limpiarForm();
-                cargarFaenas();
+                await cargarFaenas();
                 switchTab('faenas');
+            } else {
+                toast('⚠️ Error al guardar, intentá de nuevo');
             }
         }
 
