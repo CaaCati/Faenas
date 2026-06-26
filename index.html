@@ -587,9 +587,14 @@
             }).join('');
         }
 
+        const _enviandoIds = new Set();
+
         async function enviarNotificacion(id) {
+            if (_enviandoIds.has(id)) return; // bloqueo instantáneo para esta fila específica
+            _enviandoIds.add(id);
+
             const envio = window._faenaEnvio[id];
-            if (!envio) return toast('⚠️ Error: datos de envío no encontrados');
+            if (!envio) { _enviandoIds.delete(id); return toast('⚠️ Error: datos de envío no encontrados'); }
             const { telefono, mensaje } = envio;
             showLoading(true);
             try {
@@ -607,8 +612,10 @@
                 }
             } catch (e) {
                 toast('⚠️ No se pudo conectar con el bot. Verificá que esté activo.');
+            } finally {
+                showLoading(false);
+                _enviandoIds.delete(id);
             }
-            showLoading(false);
         }
 
         async function cambiarEstado(id, nuevoEstado) {
@@ -621,7 +628,12 @@
             }
         }
 
+        let _guardandoFaena = false;
+
         async function guardarFaena() {
+            if (_guardandoFaena) return; // bloqueo instantáneo, antes que cualquier otra cosa
+            _guardandoFaena = true;
+
             const data = {
                 action: 'addFaena',
                 fecha: document.getElementById('nueva-fecha').value,
@@ -632,6 +644,7 @@
 
             if (!data.fecha || !data.id_carnicero || !data.animales || !data.monto) {
                 toast('⚠️ Por favor completa todos los campos');
+                _guardandoFaena = false;
                 return;
             }
 
@@ -640,19 +653,25 @@
             btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
 
             showLoading(true);
-            const res = await fetch(API, { method: 'POST', body: JSON.stringify(data) }).then(r => r.json());
-            showLoading(false);
+            try {
+                const res = await fetch(API, { method: 'POST', body: JSON.stringify(data) }).then(r => r.json());
+                showLoading(false);
 
-            btn.disabled = false;
-            btn.innerHTML = '<i class="ti ti-device-floppy"></i> Guardar Registro';
-
-            if (res.ok) {
-                toast('✅ Registro guardado con éxito');
-                limpiarForm();
-                await cargarFaenas();
-                switchTab('faenas');
-            } else {
-                toast('⚠️ Error al guardar, intentá de nuevo');
+                if (res.ok) {
+                    toast('✅ Registro guardado con éxito');
+                    limpiarForm();
+                    await cargarFaenas();
+                    switchTab('faenas');
+                } else {
+                    toast('⚠️ Error al guardar, intentá de nuevo');
+                }
+            } catch (e) {
+                showLoading(false);
+                toast('⚠️ Error de conexión, intentá de nuevo');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ti ti-device-floppy"></i> Guardar Registro';
+                _guardandoFaena = false;
             }
         }
 
