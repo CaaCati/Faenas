@@ -1,4 +1,4 @@
-const CACHE_NAME = 'faenas-v4'; // 👈 subir este número cada vez que hagas un cambio importante en el HTML/JS
+const CACHE_NAME = 'faenas-v5'; // 👈 subir este número cada vez que hagas un cambio importante en el HTML/JS
 
 const ASSETS = [
   './',
