@@ -1,56 +1,751 @@
-const CACHE_NAME = 'faenas-v4'; // 👈 subir este número cada vez que hagas un cambio importante en el HTML/JS
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="icono.png"> <!-- Icono de instalación -->
+    
+    <!-- External Assets -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #dbeafe;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --sidebar-width: 260px;
+        }
 
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icono.png',
-  './logo.png'
-];
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-main); line-height: 1.6; overflow: hidden; }
 
-self.addEventListener('install', event => {
-  self.skipWaiting(); // fuerza a que el SW nuevo no espere a que se cierren las pestañas viejas
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
-});
+        /* Layout */
+        .app-container { display: flex; height: 100vh; width: 100vw; }
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    Promise.all([
-      // Borra caches viejos (de versiones anteriores del sw.js)
-      caches.keys().then(keys =>
-        Promise.all(
-          keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-        )
-      ),
-      self.clients.claim() // toma control inmediato de todas las pestañas abiertas
-    ])
-  );
-});
+        /* Sidebar */
+        .sidebar { width: var(--sidebar-width); background: #0f172a; color: white; display: flex; flex-direction: column; padding: 1.5rem; }
+        .sidebar-header { display: flex; align-items: center; gap: 12px; margin-bottom: 2.5rem; padding: 0 0.5rem; }
+        .logo-img { width: 40px; height: 40px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .logo-img img { width: 100%; height: 100%; object-fit: contain; }
+        .sidebar-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+        .sidebar-title span { color: var(--primary); font-size: 0.8rem; display: block; font-weight: 400; }
 
-self.addEventListener('fetch', event => {
-  // Nunca cachear llamadas al Apps Script (esto ya lo tenías bien)
-  if (event.request.url.includes('script.google.com')) {
-    return fetch(event.request);
-  }
+        .nav-menu { flex: 1; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; color: #94a3b8; text-decoration: none; border-radius: var(--radius-md); margin-bottom: 8px; cursor: pointer; transition: all 0.2s; border: none; background: transparent; width: 100%; font-size: 0.95rem; font-weight: 500; }
+        .nav-item i { font-size: 1.25rem; }
+        .nav-item:hover { background: rgba(255,255,255,0.05); color: white; }
+        .nav-item.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
 
-  // Solo cachear peticiones GET (evita errores con POST/OPTIONS, etc.)
-  if (event.request.method !== 'GET') {
-    return;
-  }
+        .sidebar-footer { padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.8rem; color: #64748b; }
 
-  // Network-first para el HTML/JS de la app: siempre intenta traer la versión
-  // más nueva del servidor, y solo usa la caché como respaldo offline.
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, responseClone);
-        });
-        return response;
-      })
-      .catch(() => caches.match(event.request))
-  );
-});
+        /* Main Content */
+        .main-content { flex: 1; overflow-y: auto; padding: 2rem; position: relative; }
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        .page-title { font-size: 1.75rem; font-weight: 700; color: #0f172a; }
+        .current-date { font-size: 0.9rem; color: var(--text-muted); }
+
+        /* Dashboard Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid var(--border); position: relative; overflow: hidden; }
+        .stat-card::after { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--primary); }
+        .stat-card.success::after { background: var(--success); }
+        .stat-card.warning::after { background: var(--warning); }
+        .stat-card-label { font-size: 0.875rem; color: var(--text-muted); font-weight: 500; margin-bottom: 0.5rem; }
+        .stat-card-value { font-size: 1.875rem; font-weight: 700; color: #0f172a; }
+        .stat-card-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+        /* Advanced Filters Area */
+        .filters-panel { background: var(--bg-card); padding: 1.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid var(--border); margin-bottom: 2rem; }
+        .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: flex-end; }
+        .filter-group { display: flex; flex-direction: column; gap: 6px; }
+        .filter-group label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+        .filter-input { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+        .filter-input:focus { border-color: var(--primary); ring: 2px solid var(--primary-light); }
+        .btn-filter-reset { padding: 10px; background: #f1f5f9; border: none; border-radius: 8px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .btn-filter-reset:hover { background: #e2e8f0; color: var(--text-main); }
+
+        /* Data Table Styles */
+        .table-container { background: var(--bg-card); border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid var(--border); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        thead { background: #f8fafc; border-bottom: 1px solid var(--border); }
+        th { padding: 16px 20px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        td { padding: 16px 20px; font-size: 0.9rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background-color: #f8fafc; }
+
+        /* Badges */
+        .badge { padding: 4px 10px; border-radius: 50px; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-pendiente { background: #fef3c7; color: #92400e; }
+        .badge-enviado { background: #dbeafe; color: #1e40af; }
+        .badge-pagado { background: #dcfce7; color: #166534; }
+
+        /* Buttons */
+        .btn { padding: 8px 16px; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; text-decoration: none; }
+        .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2); }
+        .btn-whatsapp { background: #22c55e; color: white; border-color: #22c55e; }
+        .btn-whatsapp:hover { background: #16a34a; transform: translateY(-1px); }
+        .btn-ghost { background: transparent; color: var(--text-muted); border: none; }
+        .btn-ghost:hover { background: #f1f5f9; color: var(--text-main); }
+
+        /* Forms */
+        .form-card { max-width: 800px; background: var(--bg-card); padding: 2.5rem; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid var(--border); margin: 0 auto; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+        .form-group { display: flex; flex-direction: column; gap: 8px; }
+        .form-group.full { grid-column: span 2; }
+        .form-group label { font-size: 0.875rem; font-weight: 600; color: var(--text-main); }
+        .form-control { padding: 12px 16px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; outline: none; transition: all 0.2s; }
+        .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-light); }
+
+        /* Sections */
+        .section { display: none; animation: slideUp 0.4s ease-out; }
+        .section.active { display: block; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Utils */
+        .empty-state { padding: 4rem; text-align: center; color: var(--text-muted); }
+        .empty-state i { font-size: 3rem; margin-bottom: 1rem; opacity: 0.2; }
+        .toast { position: fixed; bottom: 2rem; right: 2rem; background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 500; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); transform: translateY(100px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); opacity: 0; z-index: 1000; }
+        .toast.show { transform: translateY(0); opacity: 1; }
+
+        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(4px); }
+        .spinner { width: 40px; height: 40px; border: 4px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Desktop specific tweaks */
+        @media (min-width: 1024px) {
+            .main-content { padding: 3rem; }
+        }
+        /* ── MOBILE ─────────────────────────────────── */
+        @media (max-width: 768px) {
+            body { overflow: auto; }
+            .app-container { flex-direction: column; height: auto; min-height: 100vh; }
+            .sidebar { width: 100%; flex-direction: row; align-items: center; padding: 0; order: 2; position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; border-top: 1px solid rgba(255,255,255,0.1); }
+            .sidebar-header { display: none; }
+            .sidebar-footer { display: none; }
+            .nav-menu { display: flex; flex-direction: row; width: 100%; flex: 1; }
+            .nav-item { flex: 1; flex-direction: column; gap: 2px; padding: 10px 4px 8px; font-size: 0.7rem; margin-bottom: 0; border-radius: 0; justify-content: center; text-align: center; }
+            .nav-item i { font-size: 1.4rem; }
+            .nav-item.active { background: var(--primary); box-shadow: none; }
+            .main-content { order: 1; padding: 1rem; padding-bottom: 85px; overflow-y: auto; }
+            .header-top { flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 1.25rem; }
+            .header-top .btn { width: 100%; justify-content: center; }
+            .page-title { font-size: 1.3rem; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.25rem; }
+            .stat-card { padding: 1rem; }
+            .stat-card-value { font-size: 1.4rem; }
+            .filters-panel { padding: 1rem; margin-bottom: 1.25rem; }
+            .filters-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .table-container { border-radius: var(--radius-md); overflow: visible; box-shadow: none; border: none; background: transparent; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tbody tr { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 10px; padding: 14px; box-shadow: var(--shadow); }
+            td { padding: 3px 0; border: none; font-size: 0.875rem; }
+            td:last-child { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+            .form-card { padding: 1.25rem; max-width: 100%; }
+            .form-grid { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+            .form-group.full { grid-column: span 1; }
+            #tab-carniceros > div { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 400px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .filters-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-img">
+                    <img src="logo.png" alt="Logo Municipalidad" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1216/1216844.png'">
+                </div>
+                <div class="sidebar-title">
+                    Caá Catí
+                    <span>Gestión de Faenas</span>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" onclick="switchTab('faenas')">
+                    <i class="ti ti-clipboard-list"></i> Faenas
+                </button>
+                <button class="nav-item" onclick="switchTab('nueva')">
+                    <i class="ti ti-circle-plus"></i> Registrar Faena
+                </button>
+                <button class="nav-item" onclick="switchTab('carniceros')">
+                    <i class="ti ti-users"></i> Carniceros
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                Municipalidad de Caá Catí<br>
+                Gestión Municipal &copy; 2026
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="header-top">
+                <div>
+                    <h2 class="page-title" id="page-title">Control de Faenas</h2>
+                    <p class="current-date" id="fecha-hoy"></p>
+                </div>
+                <button class="btn btn-primary" onclick="switchTab('nueva')">
+                    <i class="ti ti-plus"></i> Nueva Faena
+                </button>
+            </div>
+
+            <!-- SECTION: FAENAS / DASHBOARD -->
+            <div id="tab-faenas" class="section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-label">Total Animales</div>
+                        <div class="stat-card-value" id="stat-animales">0</div>
+                        <div class="stat-card-sub">En el periodo filtrado</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-card-label">Total Recaudado</div>
+                        <div class="stat-card-value" id="stat-monto">$0</div>
+                        <div class="stat-card-sub">Pagos confirmados</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-card-label">Pendiente de Cobro</div>
+                        <div class="stat-card-value" id="stat-pendiente">$0</div>
+                        <div class="stat-card-sub" id="stat-pend-count">0 faenas pendientes</div>
+                    </div>
+                </div>
+
+                <!-- Filtros Avanzados -->
+                <div class="filters-panel">
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label>Desde</label>
+                            <input type="date" id="filter-desde" class="filter-input" onchange="renderFaenas()">
+                        </div>
+                        <div class="filter-group">
+                            <label>Hasta</label>
+                            <input type="date" id="filter-hasta" class="filter-input" onchange="renderFaenas()">
+                        </div>
+                        <div class="filter-group">
+                            <label>Carnicero</label>
+                            <select id="filter-carnicero" class="filter-input" onchange="renderFaenas()">
+                                <option value="">Todos los carniceros</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Estado</label>
+                            <select id="filter-estado" class="filter-input" onchange="renderFaenas()">
+                                <option value="Todos">Todos los estados</option>
+                                <option value="Pendiente">Pendiente</option>
+                                <option value="Enviado">Enviado</option>
+                                <option value="Pagado">Pagado</option>
+                            </select>
+                        </div>
+                        <button class="btn-filter-reset" onclick="resetFiltros()" title="Limpiar filtros">
+                            <i class="ti ti-filter-off"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="tabla-faenas">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Carnicero</th>
+                                <th>Animales</th>
+                                <th>Monto</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lista-faenas">
+                            <!-- JS render -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SECTION: NUEVA FAENA -->
+            <div id="tab-nueva" class="section">
+                <div class="form-card">
+                    <h3 style="margin-bottom: 1.5rem; font-size: 1.25rem;">Registrar Datos de Faena</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Fecha de Faena</label>
+                            <input type="date" id="nueva-fecha" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label>Carnicero Responsable</label>
+                            <select id="nueva-carnicero" class="form-control">
+                                <option value="">Seleccionar...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Cantidad de Animales</label>
+                            <input type="number" id="nueva-animales" class="form-control" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label>Monto a Cobrar ($)</label>
+                            <input type="number" id="nueva-monto" class="form-control" placeholder="0">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button class="btn btn-ghost" onclick="switchTab('faenas')">Cancelar</button>
+                        <button class="btn btn-primary" onclick="guardarFaena()">
+                            <i class="ti ti-device-floppy"></i> Guardar Registro
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION: CARNICEROS -->
+            <div id="tab-carniceros" class="section">
+                <div style="display: grid; grid-template-columns: 1fr 350px; gap: 2rem; align-items: start;">
+                    <div class="table-container">
+                        <table id="tabla-carniceros">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre Completo</th>
+                                    <th>Teléfono / WhatsApp</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-carniceros">
+                                <!-- JS render -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="form-card" style="padding: 1.5rem;">
+                        <h4 style="margin-bottom: 1rem;">Nuevo Carnicero</h4>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label>ID (N° Contribuyente)</label>
+                            <input type="text" id="nuevo-id" class="form-control" placeholder="Ej: 1234">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label>Nombre Completo</label>
+                            <input type="text" id="nuevo-nombre" class="form-control" placeholder="Ej: Juan Pérez">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 1.5rem;">
+                            <label>Teléfono (WhatsApp)</label>
+                            <input type="tel" id="nuevo-tel" class="form-control" placeholder="3794123456">
+                        </div>
+                        <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="agregarCarnicero()">
+                            <i class="ti ti-user-plus"></i> Registrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const API = 'https://script.google.com/macros/s/AKfycbxveMtytdsyxYJCtupxHdsmcRVhw7EPgkM_AsCoU7be0n_mkhOmQTbwyBRJJEYuGlMPiw/exec';
+        const ALIAS = 'MCC2025';
+        const BOT_URL = 'https://faenacc.duckdns.org';
+        let faenas = [], carniceros = [];
+
+        function init() {
+            const d = new Date();
+            document.getElementById('fecha-hoy').textContent = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            document.getElementById('nueva-fecha').value = d.toISOString().split('T')[0];
+            
+            // Filtros por defecto (día actual)
+            const hoyStr = d.toISOString().split('T')[0];
+            document.getElementById('filter-desde').value = hoyStr;
+            document.getElementById('filter-hasta').value = hoyStr;
+
+            cargarCarniceros();
+            cargarFaenas();
+        }
+
+        function switchTab(t) {
+            document.querySelectorAll('.nav-item').forEach(b => {
+                const isTarget = b.getAttribute('onclick').includes(t);
+                b.classList.toggle('active', isTarget);
+            });
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById('tab-' + t).classList.add('active');
+            
+            const titles = { faenas: 'Control de Faenas', nueva: 'Nueva Faena', carniceros: 'Gestión de Carniceros' };
+            document.getElementById('page-title').textContent = titles[t];
+        }
+
+        function toast(msg) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 3000);
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+
+        // Helper para fechas
+        function parseFecha(f) {
+            if (!f) return new Date(0);
+            if (f instanceof Date) return f;
+            if (typeof f === 'string') {
+                if (f.includes('/')) {
+                    const [d, m, a] = f.split('/');
+                    return new Date(a, m - 1, d);
+                }
+                return new Date(f);
+            }
+            return new Date(f);
+        }
+
+        function formatFecha(f) {
+            const d = parseFecha(f);
+            if (isNaN(d.getTime())) return f;
+            return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        async function cargarCarniceros() {
+            const res = await fetch(`${API}?action=getCarniceros`).then(r => r.json());
+            if (res.ok) {
+                carniceros = res.data;
+                renderCarniceros();
+                poblarSelects();
+            }
+        }
+
+        async function cargarFaenas() {
+            showLoading(true);
+            const res = await fetch(`${API}?action=getFaenas`).then(r => r.json());
+            showLoading(false);
+            if (res.ok) {
+                faenas = res.data;
+                renderFaenas();
+            }
+        }
+
+        function poblarSelects() {
+            const selects = ['nueva-carnicero', 'filter-carnicero'];
+            selects.forEach(id => {
+                const sel = document.getElementById(id);
+                const current = sel.value;
+                sel.innerHTML = id.includes('filter') ? '<option value="">Todos los carniceros</option>' : '<option value="">Seleccionar...</option>';
+                carniceros.forEach(c => {
+                    const o = document.createElement('option');
+                    o.value = c.id;
+                    o.textContent = c.nombre;
+                    sel.appendChild(o);
+                });
+                sel.value = current;
+            });
+        }
+
+        function renderCarniceros() {
+            const el = document.getElementById('lista-carniceros');
+            el.innerHTML = carniceros.map(c => `
+                <tr>
+                    <td>${c.id}</td>
+                    <td style="font-weight:600;">${c.nombre}</td>
+                    <td>${c.telefono}</td>
+                </tr>
+            `).join('');
+        }
+
+        function resetFiltros() {
+            const d = new Date();
+            const hoyStr = d.toISOString().split('T')[0];
+            document.getElementById('filter-desde').value = hoyStr;
+            document.getElementById('filter-hasta').value = hoyStr;
+            document.getElementById('filter-carnicero').value = "";
+            document.getElementById('filter-estado').value = "Todos";
+            renderFaenas();
+        }
+
+        function renderFaenas() {
+            const desde = document.getElementById('filter-desde').value;
+            const hasta = document.getElementById('filter-hasta').value;
+            const carniceroId = document.getElementById('filter-carnicero').value;
+            const estado = document.getElementById('filter-estado').value;
+
+            // Filtrado
+            let filtradas = faenas.filter(f => {
+                const fFecha = parseFecha(f.fecha);
+                const matchDesde = !desde || fFecha >= new Date(desde + 'T00:00:00');
+                const matchHasta = !hasta || fFecha <= new Date(hasta + 'T23:59:59');
+                const matchCarnicero = !carniceroId || f.id_carnicero == carniceroId;
+                const matchEstado = estado === 'Todos' || f.estado === estado;
+                return matchDesde && matchHasta && matchCarnicero && matchEstado;
+            });
+
+            // Ordenamiento Descendente por fecha real
+            filtradas.sort((a, b) => parseFecha(b.fecha) - parseFecha(a.fecha));
+
+            // Totales
+            let totalAnimales = 0;
+            let totalPagado = 0;
+            let totalPendiente = 0;
+            let countPendiente = 0;
+
+            filtradas.forEach(f => {
+                totalAnimales += Number(f.animales || 0);
+                if (f.estado === 'Pagado') {
+                    totalPagado += Number(f.monto || 0);
+                } else {
+                    totalPendiente += Number(f.monto || 0);
+                    countPendiente++;
+                }
+            });
+
+            // Update Stats UI
+            document.getElementById('stat-animales').textContent = totalAnimales;
+            document.getElementById('stat-monto').textContent = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(totalPagado);
+            document.getElementById('stat-pendiente').textContent = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(totalPendiente);
+            document.getElementById('stat-pend-count').textContent = `${countPendiente} faenas pendientes`;
+
+            // Render Table
+            const el = document.getElementById('lista-faenas');
+            if (!filtradas.length) {
+                el.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="ti ti-database-off"></i><p>No se encontraron registros con los filtros aplicados</p></div></td></tr>`;
+                return;
+            }
+
+            // Mapa de datos de envío indexado por ID de faena
+            window._faenaEnvio = {};
+
+            el.innerHTML = filtradas.map(f => {
+                const badgeClass = f.estado === 'Pendiente' ? 'badge-pendiente' : f.estado === 'Enviado' ? 'badge-enviado' : 'badge-pagado';
+                const montoFmt = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(f.monto);
+                
+                const tel = (f.telefono || '').toString().replace(/\D/g, '');
+                const animalesTxt = Number(f.animales) === 1 ? '1 animal' : `${f.animales} animales`;
+
+                // Guardamos el mensaje en el mapa para no pasarlo inline
+                window._faenaEnvio[f.id] = {
+                    telefono: tel,
+                    mensaje: `*Municipalidad de Caá Catí — Faenas*\n\n` +
+                        `Estimado/a *${f.nombre}*, le informamos que la faena del *${formatFecha(f.fecha)}* ` +
+                        `correspondiente a *${animalesTxt}* registra un importe de *${montoFmt}*.\n\n` +
+                        `Por favor realice la transferencia al siguiente alias: *${ALIAS}*\n\n` +
+                        `_Luego de realizada, envíe el comprobante por este medio y le haremos llegar su recibo correspondiente._`
+                };
+
+                let acciones = '';
+                if (f.estado === 'Pendiente') {
+                    acciones = `
+                        <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id})">
+                            <i class="ti ti-brand-whatsapp"></i> Enviar
+                        </button>
+                    `;
+                } else if (f.estado === 'Enviado') {
+                    acciones = `
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <button class="btn btn-whatsapp btn-sm" onclick="enviarNotificacion(${f.id})">
+                                <i class="ti ti-brand-whatsapp"></i> Reenviar
+                            </button>
+                            <button class="btn btn-ghost btn-sm" onclick="cambiarEstado(${f.id}, 'Pagado')" title="Marcar como pagado">
+                                <i class="ti ti-coin"></i> Pagado
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    acciones = `<span style="color:var(--success); font-size:0.8rem;"><i class="ti ti-check"></i> ${formatFecha(f.fecha_pago)}</span>`;
+                }
+
+                return `
+                    <tr>
+                        <td data-label="Fecha" style="font-weight:500;">${formatFecha(f.fecha)}</td>
+                        <td data-label="Carnicero">${f.nombre}</td>
+                        <td data-label="Animales"><i class="ti ti-paw"></i> ${f.animales}</td>
+                        <td data-label="Monto" style="font-weight:600;">${montoFmt}</td>
+                        <td data-label="Estado"><span class="badge ${badgeClass}">${f.estado}</span></td>
+                        <td data-label="Acciones"><div style="display:flex; flex-direction:column; gap:4px;">${acciones}</div></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        const _enviandoIds = new Set();
+
+        async function enviarNotificacion(id) {
+            if (_enviandoIds.has(id)) return; // bloqueo instantáneo para esta fila específica
+            _enviandoIds.add(id);
+
+            const envio = window._faenaEnvio[id];
+            if (!envio) { _enviandoIds.delete(id); return toast('⚠️ Error: datos de envío no encontrados'); }
+            const { telefono, mensaje } = envio;
+            showLoading(true);
+            try {
+                const res = await fetch(`${BOT_URL}/enviar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telefono, mensaje })
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    await cambiarEstado(id, 'Enviado');
+                    toast('✅ Notificación enviada por WhatsApp');
+                } else {
+                    toast('⚠️ Error al enviar: ' + (data.error || 'desconocido'));
+                }
+            } catch (e) {
+                toast('⚠️ No se pudo conectar con el bot. Verificá que esté activo.');
+            } finally {
+                showLoading(false);
+                _enviandoIds.delete(id);
+            }
+        }
+
+        async function cambiarEstado(id, nuevoEstado) {
+            showLoading(true);
+            const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'updateEstado', id, estado: nuevoEstado }) }).then(r => r.json());
+            showLoading(false);
+            if (res.ok) {
+                toast(`Estado actualizado a ${nuevoEstado}`);
+                cargarFaenas();
+            }
+        }
+
+        let _guardandoFaena = false;
+
+        async function guardarFaena() {
+            if (_guardandoFaena) return; // bloqueo instantáneo, antes que cualquier otra cosa
+            _guardandoFaena = true;
+
+            const data = {
+                action: 'addFaena',
+                fecha: document.getElementById('nueva-fecha').value,
+                id_carnicero: document.getElementById('nueva-carnicero').value,
+                animales: document.getElementById('nueva-animales').value,
+                monto: document.getElementById('nueva-monto').value
+            };
+
+            if (!data.fecha || !data.id_carnicero || !data.animales || !data.monto) {
+                toast('⚠️ Por favor completa todos los campos');
+                _guardandoFaena = false;
+                return;
+            }
+
+            const btn = document.querySelector('#tab-nueva .btn-primary');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
+
+            showLoading(true);
+            try {
+                const res = await fetch(API, { method: 'POST', body: JSON.stringify(data) }).then(r => r.json());
+                showLoading(false);
+
+                if (res.ok) {
+                    toast('✅ Registro guardado con éxito');
+                    limpiarForm();
+                    await cargarFaenas();
+                    switchTab('faenas');
+                } else {
+                    toast('⚠️ Error al guardar, intentá de nuevo');
+                }
+            } catch (e) {
+                showLoading(false);
+                toast('⚠️ Error de conexión, intentá de nuevo');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ti ti-device-floppy"></i> Guardar Registro';
+                _guardandoFaena = false;
+            }
+        }
+
+        function limpiarForm() {
+            document.getElementById('nueva-fecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('nueva-carnicero').value = "";
+            document.getElementById('nueva-animales').value = "";
+            document.getElementById('nueva-monto').value = "";
+        }
+
+        async function agregarCarnicero() {
+            const id = document.getElementById('nuevo-id').value.trim();
+            const nombre = document.getElementById('nuevo-nombre').value.trim();
+            const telefono = document.getElementById('nuevo-tel').value.trim();
+            if (!id || !nombre || !telefono) return toast('⚠️ ID, nombre y teléfono son requeridos');
+
+            const btn = document.querySelector('#tab-carniceros .btn-primary');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
+
+            showLoading(true);
+            const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'addCarnicero', id, nombre, telefono }) }).then(r => r.json());
+            showLoading(false);
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-user-plus"></i> Registrar';
+
+            if (res.ok) {
+                toast('✅ Carnicero registrado');
+                document.getElementById('nuevo-id').value = "";
+                document.getElementById('nuevo-nombre').value = "";
+                document.getElementById('nuevo-tel').value = "";
+                await cargarCarniceros();
+            } else {
+                toast('⚠️ ' + (res.error || 'Error al registrar'));
+            }
+        }
+
+        function copiarTel(tel) {
+            navigator.clipboard.writeText(tel);
+            toast('Teléfono copiado al portapapeles');
+        }
+
+        // Registro del Service Worker para PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => {
+                        console.log('PWA lista');
+
+                        // Detecta cuando se instala una versión nueva del SW
+                        reg.addEventListener('updatefound', () => {
+                            const nuevoSW = reg.installing;
+                            nuevoSW.addEventListener('statechange', () => {
+                                if (nuevoSW.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // Hay una versión nueva lista: recargamos para tomarla
+                                    window.location.reload();
+                                }
+                            });
+                        });
+                    })
+                    .catch(err => console.log('Error PWA', err));
+            });
+
+            // Evita loops de recarga si varias pestañas están abiertas a la vez
+            let refrescando = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refrescando) return;
+                refrescando = true;
+                window.location.reload();
+            });
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
