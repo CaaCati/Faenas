@@ -1,4 +1,4 @@
-const CACHE_NAME = 'faenas-v5'; // 👈 subir este número cada vez que hagas un cambio importante en el HTML/JS
+const CACHE_NAME = 'faenas-v6'; // 👈 subir este número cada vez que hagas un cambio importante en el HTML/JS
 
 const ASSETS = [
   './',
@@ -30,9 +30,11 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Nunca cachear llamadas al Apps Script (esto ya lo tenías bien)
+  // Nunca interceptar llamadas al Apps Script: no responder nada y listo.
+  // (OJO: NO volver a llamar fetch(event.request) acá, eso dispara un
+  // segundo pedido real a la red y duplica los POST de creación).
   if (event.request.url.includes('script.google.com')) {
-    return fetch(event.request);
+    return;
   }
 
   // Solo cachear peticiones GET (evita errores con POST/OPTIONS, etc.)
