@@ -741,7 +741,16 @@
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 if (refrescando) return;
                 refrescando = true;
-                window.location.reload();
+
+                // No recargar si hay una operación en curso (ej: guardando una faena)
+                const esperarYRecargar = () => {
+                    if (typeof _guardandoFaena !== 'undefined' && _guardandoFaena) {
+                        setTimeout(esperarYRecargar, 500);
+                        return;
+                    }
+                    window.location.reload();
+                };
+                esperarYRecargar();
             });
         }
 
