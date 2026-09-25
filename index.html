@@ -332,6 +332,7 @@
                                     <th>ID</th>
                                     <th>Nombre Completo</th>
                                     <th>Teléfono / WhatsApp</th>
+                                    <th>Acciones</th>
                                 </tr>
                             </thead>
                             <tbody id="lista-carniceros">
@@ -341,7 +342,7 @@
                     </div>
 
                     <div class="form-card" style="padding: 1.5rem;">
-                        <h4 style="margin-bottom: 1rem;">Nuevo Carnicero</h4>
+                        <h4 style="margin-bottom: 1rem;" id="carnicero-form-titulo">Nuevo Carnicero</h4>
                         <div class="form-group" style="margin-bottom: 1rem;">
                             <label>ID (N° Contribuyente)</label>
                             <input type="text" id="nuevo-id" class="form-control" placeholder="Ej: 1234">
@@ -354,8 +355,11 @@
                             <label>Teléfono (WhatsApp)</label>
                             <input type="tel" id="nuevo-tel" class="form-control" placeholder="3794123456">
                         </div>
-                        <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="agregarCarnicero()">
+                        <button class="btn btn-primary" id="btn-carnicero" style="width: 100%; justify-content: center;" onclick="agregarCarnicero()">
                             <i class="ti ti-user-plus"></i> Registrar
+                        </button>
+                        <button class="btn btn-ghost" id="btn-carnicero-cancelar" style="width: 100%; justify-content: center; margin-top: 8px; display: none;" onclick="cancelarEdicionCarnicero()">
+                            Cancelar edición
                         </button>
                     </div>
                 </div>
@@ -366,10 +370,89 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        const API = 'https://script.google.com/macros/s/AKfycbxveMtytdsyxYJCtupxHdsmcRVhw7EPgkM_AsCoU7be0n_mkhOmQTbwyBRJJEYuGlMPiw/exec';
+        const SB_URL = 'https://crvpynbdwuhtsjauaxhb.supabase.co';
+        const SB_KEY = 'sb_publishable_Zs8YxMwdd9VA2gcsghib5A_udCiG5Sx';
         const ALIAS = 'MATADEROCC';
         const BOT_URL = 'https://faenacc.duckdns.org';
         let faenas = [], carniceros = [];
+
+        // ── Acceso a Supabase ───────────────────────────────
+        // Todas las funciones devuelven { ok, data, error } (mismo formato que el
+        // Apps Script anterior) y nunca lanzan excepciones.
+        async function sb(path, { method = 'GET', body, prefer } = {}) {
+            try {
+                const headers = { apikey: SB_KEY, 'Content-Type': 'application/json' };
+                if (prefer) headers.Prefer = prefer;
+                const r = await fetch(`${SB_URL}/rest/v1/${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+                const txt = await r.text();
+                const data = txt ? JSON.parse(txt) : null;
+                if (!r.ok) return { ok: false, error: (data && data.message) || r.statusText, code: data && data.code, details: data && data.details };
+                return { ok: true, data };
+            } catch (e) {
+                return { ok: false, error: 'Error de conexión' };
+            }
+        }
+
+        const api = {
+            getCarniceros: () => sb('carniceros?select=id,nombre,telefono&order=nombre.asc'),
+
+            async getFaenas() {
+                // Supabase devuelve como máximo 1000 filas por pedido: se piden por páginas
+                const todas = [];
+                for (let offset = 0; ; offset += 1000) {
+                    const res = await sb(`faenas?select=id,fecha,id_carnicero,animales,monto,estado,fecha_pago,carniceros(nombre,telefono)&order=id.asc&limit=1000&offset=${offset}`);
+                    if (!res.ok) return res;
+                    todas.push(...res.data);
+                    if (res.data.length < 1000) break;
+                }
+                return {
+                    ok: true,
+                    data: todas.map(f => ({
+                        id: f.id,
+                        fecha: f.fecha,
+                        id_carnicero: f.id_carnicero,
+                        nombre: f.carniceros ? f.carniceros.nombre : '?',
+                        telefono: f.carniceros ? f.carniceros.telefono : '',
+                        animales: f.animales,
+                        monto: Number(f.monto),
+                        estado: f.estado,
+                        fecha_pago: f.fecha_pago || ''
+                    }))
+                };
+            },
+
+            async addFaena(d) {
+                const res = await sb('faenas', {
+                    method: 'POST', prefer: 'return=minimal',
+                    body: { fecha: d.fecha, id_carnicero: d.id_carnicero, animales: Number(d.animales), monto: Number(d.monto), request_id: d.request_id }
+                });
+                // Mismo request_id ya guardado = el primer intento llegó bien: no se duplica
+                if (!res.ok && res.code === '23505' && String(res.error).includes('request_id')) return { ok: true };
+                return res;
+            },
+
+            updateEstado: (id, estado) => sb(`faenas?id=eq.${id}`, { method: 'PATCH', prefer: 'return=minimal', body: { estado } }),
+
+            async addCarnicero(c) {
+                const res = await sb('carniceros', { method: 'POST', prefer: 'return=minimal', body: c });
+                if (!res.ok && res.code === '23505') return { ok: false, error: 'Ya existe un carnicero con ese ID' };
+                return res;
+            },
+
+            async updateCarnicero(idOriginal, c) {
+                const res = await sb(`carniceros?id=eq.${encodeURIComponent(idOriginal)}`, { method: 'PATCH', prefer: 'return=representation', body: c });
+                if (!res.ok && res.code === '23505') return { ok: false, error: 'Ya existe un carnicero con ese ID' };
+                if (res.ok && !res.data.length) return { ok: false, error: 'Carnicero no encontrado' };
+                return res;
+            },
+
+            async deleteCarnicero(id) {
+                const res = await sb(`carniceros?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', prefer: 'return=representation' });
+                if (!res.ok && res.code === '23503') return { ok: false, error: 'No se puede eliminar: tiene faenas registradas. Podés editar sus datos.' };
+                if (res.ok && !res.data.length) return { ok: false, error: 'Carnicero no encontrado' };
+                return res;
+            }
+        };
 
         function init() {
             const d = new Date();
@@ -413,6 +496,11 @@
             if (!f) return new Date(0);
             if (f instanceof Date) return f;
             if (typeof f === 'string') {
+                // 'YYYY-MM-DD' (Supabase): fecha local, no UTC (si no, muestra el día anterior)
+                if (/^\d{4}-\d{2}-\d{2}$/.test(f)) {
+                    const [a, m, d] = f.split('-');
+                    return new Date(a, m - 1, d);
+                }
                 if (f.includes('/')) {
                     const [d, m, a] = f.split('/');
                     return new Date(a, m - 1, d);
@@ -429,7 +517,7 @@
         }
 
         async function cargarCarniceros() {
-            const res = await fetch(`${API}?action=getCarniceros`).then(r => r.json());
+            const res = await api.getCarniceros();
             if (res.ok) {
                 carniceros = res.data;
                 renderCarniceros();
@@ -439,7 +527,7 @@
 
         async function cargarFaenas() {
             showLoading(true);
-            const res = await fetch(`${API}?action=getFaenas`).then(r => r.json());
+            const res = await api.getFaenas();
             showLoading(false);
             if (res.ok) {
                 faenas = res.data;
@@ -465,11 +553,21 @@
 
         function renderCarniceros() {
             const el = document.getElementById('lista-carniceros');
-            el.innerHTML = carniceros.map(c => `
+            el.innerHTML = carniceros.map((c, i) => `
                 <tr>
                     <td>${c.id}</td>
                     <td style="font-weight:600;">${c.nombre}</td>
                     <td>${c.telefono}</td>
+                    <td>
+                        <div style="display:flex; gap:4px;">
+                            <button class="btn btn-ghost btn-sm" onclick="editarCarnicero(${i})" title="Editar">
+                                <i class="ti ti-pencil"></i>
+                            </button>
+                            <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="eliminarCarnicero(${i})" title="Eliminar">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </td>
                 </tr>
             `).join('');
         }
@@ -621,7 +719,7 @@
 
         async function cambiarEstado(id, nuevoEstado) {
             showLoading(true);
-            const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'updateEstado', id, estado: nuevoEstado }) }).then(r => r.json());
+            const res = await api.updateEstado(id, nuevoEstado);
             showLoading(false);
             if (res.ok) {
                 toast(`Estado actualizado a ${nuevoEstado}`);
@@ -630,13 +728,15 @@
         }
 
         let _guardandoFaena = false;
+        // Identificador del intento de guardado: si la conexión falla pero la faena sí
+        // llegó a guardarse, reintentar con los mismos datos no la duplica (la base lo rechaza).
+        let _faenaIntento = null;
 
         async function guardarFaena() {
             if (_guardandoFaena) return; // bloqueo instantáneo, antes que cualquier otra cosa
             _guardandoFaena = true;
 
             const data = {
-                action: 'addFaena',
                 fecha: document.getElementById('nueva-fecha').value,
                 id_carnicero: document.getElementById('nueva-carnicero').value,
                 animales: document.getElementById('nueva-animales').value,
@@ -649,16 +749,23 @@
                 return;
             }
 
+            const firma = JSON.stringify(data);
+            if (!_faenaIntento || _faenaIntento.firma !== firma) {
+                _faenaIntento = { firma, id: crypto.randomUUID() };
+            }
+            data.request_id = _faenaIntento.id;
+
             const btn = document.querySelector('#tab-nueva .btn-primary');
             btn.disabled = true;
             btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
 
             showLoading(true);
             try {
-                const res = await fetch(API, { method: 'POST', body: JSON.stringify(data) }).then(r => r.json());
+                const res = await api.addFaena(data);
                 showLoading(false);
 
                 if (res.ok) {
+                    _faenaIntento = null;
                     toast('✅ Registro guardado con éxito');
                     limpiarForm();
                     await cargarFaenas();
@@ -683,31 +790,95 @@
             document.getElementById('nueva-monto').value = "";
         }
 
+        // ID original del carnicero que se está editando (null = alta de uno nuevo)
+        let _editandoCarnicero = null;
+        let _guardandoCarnicero = false;
+
+        function textoBotonCarnicero() {
+            return _editandoCarnicero === null
+                ? '<i class="ti ti-user-plus"></i> Registrar'
+                : '<i class="ti ti-device-floppy"></i> Guardar cambios';
+        }
+
+        function limpiarFormCarnicero() {
+            _editandoCarnicero = null;
+            document.getElementById('nuevo-id').value = "";
+            document.getElementById('nuevo-nombre').value = "";
+            document.getElementById('nuevo-tel').value = "";
+            document.getElementById('carnicero-form-titulo').textContent = 'Nuevo Carnicero';
+            document.getElementById('btn-carnicero').innerHTML = textoBotonCarnicero();
+            document.getElementById('btn-carnicero-cancelar').style.display = 'none';
+        }
+
+        function editarCarnicero(i) {
+            const c = carniceros[i];
+            if (!c) return;
+            _editandoCarnicero = c.id;
+            document.getElementById('nuevo-id').value = c.id;
+            document.getElementById('nuevo-nombre').value = c.nombre;
+            document.getElementById('nuevo-tel').value = c.telefono;
+            document.getElementById('carnicero-form-titulo').textContent = 'Editar Carnicero';
+            document.getElementById('btn-carnicero').innerHTML = textoBotonCarnicero();
+            document.getElementById('btn-carnicero-cancelar').style.display = 'flex';
+            // En el celular el formulario queda debajo de la lista: llevarlo a la vista
+            document.querySelector('#tab-carniceros .form-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function cancelarEdicionCarnicero() {
+            limpiarFormCarnicero();
+        }
+
         async function agregarCarnicero() {
+            if (_guardandoCarnicero) return;
+
             const id = document.getElementById('nuevo-id').value.trim();
             const nombre = document.getElementById('nuevo-nombre').value.trim();
             const telefono = document.getElementById('nuevo-tel').value.trim();
             if (!id || !nombre || !telefono) return toast('⚠️ ID, nombre y teléfono son requeridos');
 
-            const btn = document.querySelector('#tab-carniceros .btn-primary');
+            _guardandoCarnicero = true;
+            const editando = _editandoCarnicero !== null;
+            const btn = document.getElementById('btn-carnicero');
             btn.disabled = true;
             btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
 
             showLoading(true);
-            const res = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'addCarnicero', id, nombre, telefono }) }).then(r => r.json());
+            const res = editando
+                ? await api.updateCarnicero(_editandoCarnicero, { id, nombre, telefono })
+                : await api.addCarnicero({ id, nombre, telefono });
             showLoading(false);
 
             btn.disabled = false;
-            btn.innerHTML = '<i class="ti ti-user-plus"></i> Registrar';
+            btn.innerHTML = textoBotonCarnicero();
+            _guardandoCarnicero = false;
 
             if (res.ok) {
-                toast('✅ Carnicero registrado');
-                document.getElementById('nuevo-id').value = "";
-                document.getElementById('nuevo-nombre').value = "";
-                document.getElementById('nuevo-tel').value = "";
+                toast(editando ? '✅ Carnicero actualizado' : '✅ Carnicero registrado');
+                limpiarFormCarnicero();
                 await cargarCarniceros();
+                if (editando) cargarFaenas(); // refresca nombre/teléfono en la lista de faenas
             } else {
                 toast('⚠️ ' + (res.error || 'Error al registrar'));
+            }
+        }
+
+        async function eliminarCarnicero(i) {
+            const c = carniceros[i];
+            if (!c || _guardandoCarnicero) return;
+            if (!confirm(`¿Eliminar al carnicero ${c.nombre} (ID ${c.id})?`)) return;
+
+            _guardandoCarnicero = true;
+            showLoading(true);
+            const res = await api.deleteCarnicero(c.id);
+            showLoading(false);
+            _guardandoCarnicero = false;
+
+            if (res.ok) {
+                toast('🗑️ Carnicero eliminado');
+                if (_editandoCarnicero === c.id) limpiarFormCarnicero();
+                await cargarCarniceros();
+            } else {
+                toast('⚠️ ' + (res.error || 'Error al eliminar'));
             }
         }
 

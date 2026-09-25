@@ -1,4 +1,4 @@
-const CACHE_NAME = 'faenas-v7'; // 👈 subir este número cada vez que hagas un cambio importante en el HTML/JS
+const CACHE_NAME = 'faenas-v8'; // 👈 subir este número cada vez que hagas un cambio importante en el HTML/JS
 
 const ASSETS = [
   './',
@@ -30,10 +30,10 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Nunca interceptar llamadas al Apps Script: no responder nada y listo.
+  // Nunca interceptar llamadas a la base de datos (Supabase / Apps Script): no responder nada y listo.
   // (OJO: NO volver a llamar fetch(event.request) acá, eso dispara un
   // segundo pedido real a la red y duplica los POST de creación).
-  if (event.request.url.includes('script.google.com')) {
+  if (event.request.url.includes('script.google.com') || event.request.url.includes('supabase.co')) {
     return;
   }
 
