@@ -298,7 +298,7 @@
             <!-- SECTION: NUEVA FAENA -->
             <div id="tab-nueva" class="section">
                 <div class="form-card">
-                    <h3 style="margin-bottom: 1.5rem; font-size: 1.25rem;">Registrar Datos de Faena</h3>
+                    <h3 style="margin-bottom: 1.5rem; font-size: 1.25rem;" id="faena-form-titulo">Registrar Datos de Faena</h3>
                     <div class="form-grid">
                         <div class="form-group">
                             <label>Fecha de Faena</label>
@@ -321,7 +321,7 @@
                     </div>
                     <div style="display: flex; gap: 1rem; justify-content: flex-end;">
                         <button class="btn btn-ghost" onclick="switchTab('faenas')">Cancelar</button>
-                        <button class="btn btn-primary" onclick="guardarFaena()">
+                        <button class="btn btn-primary" id="btn-faena" onclick="guardarFaena()">
                             <i class="ti ti-device-floppy"></i> Guardar Registro
                         </button>
                     </div>
@@ -439,6 +439,21 @@
 
             updateEstado: (id, estado) => sb(`faenas?id=eq.${id}`, { method: 'PATCH', prefer: 'return=minimal', body: { estado } }),
 
+            async updateFaena(id, d) {
+                const res = await sb(`faenas?id=eq.${id}`, {
+                    method: 'PATCH', prefer: 'return=representation',
+                    body: { fecha: d.fecha, id_carnicero: d.id_carnicero, animales: Number(d.animales), monto: Number(d.monto) }
+                });
+                if (res.ok && !res.data.length) return { ok: false, error: 'Faena no encontrada' };
+                return res;
+            },
+
+            async deleteFaena(id) {
+                const res = await sb(`faenas?id=eq.${id}`, { method: 'DELETE', prefer: 'return=representation' });
+                if (res.ok && !res.data.length) return { ok: false, error: 'Faena no encontrada (o sin permiso para eliminar)' };
+                return res;
+            },
+
             async addCarnicero(c) {
                 const res = await sb('carniceros', { method: 'POST', prefer: 'return=minimal', body: c });
                 if (!res.ok && res.code === '23505') return { ok: false, error: 'Ya existe un carnicero con ese ID' };
@@ -474,7 +489,9 @@
             cargarFaenas();
         }
 
-        function switchTab(t) {
+        function switchTab(t, mantenerEdicion = false) {
+            // Salir del formulario (o entrar desde el menú) descarta una edición en curso
+            if (!mantenerEdicion && _editandoFaena !== null) limpiarForm();
             document.querySelectorAll('.nav-item').forEach(b => {
                 const isTarget = b.getAttribute('onclick').includes(t);
                 b.classList.toggle('active', isTarget);
@@ -482,7 +499,7 @@
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById('tab-' + t).classList.add('active');
             
-            const titles = { faenas: 'Control de Faenas', nueva: 'Nueva Faena', carniceros: 'Gestión de Carniceros' };
+            const titles = { faenas: 'Control de Faenas', nueva: _editandoFaena !== null ? 'Editar Faena' : 'Nueva Faena', carniceros: 'Gestión de Carniceros' };
             document.getElementById('page-title').textContent = titles[t];
         }
 
@@ -678,6 +695,16 @@
                 } else {
                     acciones = `<span style="color:var(--success); font-size:0.8rem;"><i class="ti ti-check"></i> ${formatFecha(f.fecha_pago)}</span>`;
                 }
+                acciones += `
+                    <div style="display:flex; gap:4px;">
+                        <button class="btn btn-ghost btn-sm" onclick="editarFaena(${f.id})" title="Editar faena">
+                            <i class="ti ti-pencil"></i>
+                        </button>
+                        <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="eliminarFaena(${f.id})" title="Eliminar faena">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </div>
+                `;
 
                 return `
                     <tr>
@@ -734,6 +761,8 @@
         }
 
         let _guardandoFaena = false;
+        // ID de la faena que se está editando (null = alta de una nueva)
+        let _editandoFaena = null;
         // Identificador del intento de guardado: si la conexión falla pero la faena sí
         // llegó a guardarse, reintentar con los mismos datos no la duplica (la base lo rechaza).
         let _faenaIntento = null;
@@ -755,45 +784,93 @@
                 return;
             }
 
-            const firma = JSON.stringify(data);
-            if (!_faenaIntento || _faenaIntento.firma !== firma) {
-                _faenaIntento = { firma, id: crypto.randomUUID() };
+            const editando = _editandoFaena !== null;
+            if (!editando) {
+                const firma = JSON.stringify(data);
+                if (!_faenaIntento || _faenaIntento.firma !== firma) {
+                    _faenaIntento = { firma, id: crypto.randomUUID() };
+                }
+                data.request_id = _faenaIntento.id;
             }
-            data.request_id = _faenaIntento.id;
 
-            const btn = document.querySelector('#tab-nueva .btn-primary');
+            const btn = document.getElementById('btn-faena');
             btn.disabled = true;
             btn.innerHTML = '<i class="ti ti-loader"></i> Guardando...';
 
             showLoading(true);
             try {
-                const res = await api.addFaena(data);
+                const res = editando ? await api.updateFaena(_editandoFaena, data) : await api.addFaena(data);
                 showLoading(false);
 
                 if (res.ok) {
-                    _faenaIntento = null;
-                    toast('✅ Registro guardado con éxito');
+                    if (!editando) _faenaIntento = null;
+                    toast(editando ? '✅ Faena actualizada' : '✅ Registro guardado con éxito');
                     limpiarForm();
                     await cargarFaenas();
                     switchTab('faenas');
                 } else {
-                    toast('⚠️ Error al guardar, intentá de nuevo');
+                    toast('⚠️ ' + (editando && res.error ? res.error : 'Error al guardar, intentá de nuevo'));
                 }
             } catch (e) {
                 showLoading(false);
                 toast('⚠️ Error de conexión, intentá de nuevo');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="ti ti-device-floppy"></i> Guardar Registro';
+                btn.innerHTML = textoBotonFaena();
                 _guardandoFaena = false;
             }
         }
 
+        function textoBotonFaena() {
+            return _editandoFaena === null
+                ? '<i class="ti ti-device-floppy"></i> Guardar Registro'
+                : '<i class="ti ti-device-floppy"></i> Guardar cambios';
+        }
+
         function limpiarForm() {
+            _editandoFaena = null;
             document.getElementById('nueva-fecha').value = new Date().toISOString().split('T')[0];
             document.getElementById('nueva-carnicero').value = "";
             document.getElementById('nueva-animales').value = "";
             document.getElementById('nueva-monto').value = "";
+            document.getElementById('faena-form-titulo').textContent = 'Registrar Datos de Faena';
+            document.getElementById('btn-faena').innerHTML = textoBotonFaena();
+        }
+
+        function editarFaena(id) {
+            const f = faenas.find(x => x.id === id);
+            if (!f || _guardandoFaena) return;
+            _editandoFaena = id;
+            document.getElementById('nueva-fecha').value = f.fecha;
+            document.getElementById('nueva-carnicero').value = f.id_carnicero;
+            document.getElementById('nueva-animales').value = f.animales;
+            document.getElementById('nueva-monto').value = f.monto;
+            document.getElementById('faena-form-titulo').textContent =
+                f.estado === 'Pendiente' ? 'Editar Faena' : `Editar Faena (ya ${f.estado.toLowerCase()})`;
+            document.getElementById('btn-faena').innerHTML = textoBotonFaena();
+            switchTab('nueva', true);
+        }
+
+        async function eliminarFaena(id) {
+            const f = faenas.find(x => x.id === id);
+            if (!f || _guardandoFaena) return;
+            const montoFmt = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(f.monto);
+            const aviso = f.estado === 'Pagado' ? '\n\n⚠️ Esta faena ya figura como PAGADA.' : '';
+            if (!confirm(`¿Eliminar la faena del ${formatFecha(f.fecha)} de ${f.nombre} (${f.animales} animales, ${montoFmt})?\nEsta acción no se puede deshacer.${aviso}`)) return;
+
+            _guardandoFaena = true;
+            showLoading(true);
+            const res = await api.deleteFaena(id);
+            showLoading(false);
+            _guardandoFaena = false;
+
+            if (res.ok) {
+                toast('🗑️ Faena eliminada');
+                if (_editandoFaena === id) limpiarForm();
+                await cargarFaenas();
+            } else {
+                toast('⚠️ ' + (res.error || 'Error al eliminar'));
+            }
         }
 
         // ID original del carnicero que se está editando (null = alta de uno nuevo)
